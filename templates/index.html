@@ -1,0 +1,193 @@
+<html>
+<head>
+  <style>
+  .data-panel {
+    background-color: #f1f1f1;
+    font-size: 20px;
+    margin: 10px;
+    border-style: solid;
+    border-color: black;
+    border-width: 1px;
+  }
+
+  .header {
+    background-color: #f1f1f1;
+    padding: 5px;
+    font-size: 15px;
+    border-style: solid;
+    border-color: black;
+    border-width: 1px;
+  }
+
+  .row {
+    display: flex; /* equal height of the children */
+  }
+
+  .col {
+    flex: 1; /* additionally, equal width */
+    
+    padding: 10px;
+    border-style: solid;
+    border-width: 1px;
+    font-size: 15px;
+  }
+
+  .content {
+    background-color: #f1f1f1;
+    padding: 5px;
+    font-size: 20px;
+    border-style: solid;
+    border-color: black;
+    border-width: 1px;
+  }
+  </style>
+</head>
+
+<body>
+
+  <div class="data-panel">
+    <div class="header">Network Panel</div>
+    <div class="content">Connecton status: <span id="connection_status">Disconnected</span></div>
+  </div>
+
+  <div class="data-panel">
+    <div class="header">Visual Panel</div>
+
+    <div class="row">
+      <div class="col">
+        <p>Videostream</p>
+        <div id="videostream" style="border:1px solid black; float: left;">
+          <img src="data:image/jpg;base64, [your byte array]">
+        </div>
+      </div>
+      <div class="col">
+        <p>Mapping</p>
+        <canvas id="myCanvas" width="400" height="400" style="border:1px solid black;">
+        </canvas>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="data-panel">
+    <div class="header">Sensor Panel</div>
+
+    <div class="row">
+      <div class="col">
+        Left Ultrasonic
+      </div>
+      <div class="col">
+        Front Ultrasonic
+      </div>
+      <div class="col">
+        Right Ultrasonic
+      </div>
+      <div class="col">
+        Position
+      </div>
+      <div class="col">
+        Orientation
+      </div>
+      <div class="col">
+        Magnetometer
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col">
+        <span id="us_left">N/A</span>
+      </div>
+      <div class="col">
+        <span id="us_front">N/A</span>
+      </div>
+      <div class="col">
+        <span id="us_right">N/A</span>
+      </div>
+      <div class="col">
+        (<span id="position_x">N/A</span>, <span id="position_y">N/A</span>)
+      </div>
+      <div class="col">
+        <span id="orientation">N/A</span>
+      </div>
+      <div class="col">
+        <span id="magnetometer">N/A</span>
+      </div>
+    </div>
+
+  </div>
+
+</body>
+
+<script>
+
+  var update_data_frequency = 10
+  
+  setInterval(() => {
+      fetch("{{ url_for('data_feed') }}")
+      .then(response => {
+              response.json().then(j => {
+
+                  // Fill in network data
+                  connection_status.innerHTML = j.connection_status;
+
+                  // Fill in sensor data
+                  us_left.innerHTML = j.us_left;
+                  us_front.innerHTML = j.us_front;
+                  us_right.innerHTML = j.us_right;
+                  position_x.innerHTML = j.position.x;
+                  position_y.innerHTML = j.position.y;
+                  orientation.innerHTML = j.orientation;
+                  magnetometer.innerHTML = j.magnetometer;
+
+                  // Fill in video data
+                  videostream.innerHTML = j.videostream;
+
+                  // Fill in map data
+                  //    Get canvas and clear
+                  var mapping = j.mapping;
+                  var c = document.getElementById("myCanvas");
+                  var ctx = c.getContext("2d");
+                  ctx.clearRect(0, 0, c.width, c.height);
+
+                  //    Get every rectangle. Draw and fill
+                  ctx.moveTo(0,0);
+                  
+                  for(let i=0; i<mapping.n_rectangles;i++)
+                  {
+                    if (mapping[`rect${i}`]["clear"])
+                    {
+                      ctx.fillStyle = "white";
+                      ctx.fillRect(mapping[`rect${i}`]["x"],
+                                  mapping[`rect${i}`]["y"], 
+                                  mapping[`rect${i}`]["width"],
+                                  mapping[`rect${i}`]["height"]);
+                    }
+                    else
+                    {
+                      ctx.fillStyle = "black";
+                      ctx.fillRect(mapping[`rect${i}`]["x"],
+                                  mapping[`rect${i}`]["y"], 
+                                  mapping[`rect${i}`]["width"],
+                                  mapping[`rect${i}`]["height"]);
+                    }
+                  }
+
+                  //    Draw current position with dot.
+                  ctx.moveTo(0,0);
+                  ctx.fillStyle = "red";
+                  ctx.fillRect(j.position.x, j.position.y, 10, 10);
+
+                  //    Draw current orientation with small vector
+                  ctx.strokeStyle = "blue";
+                  var shift_factor = 5;
+                  ctx.moveTo(j.position.x + shift_factor, j.position.y + shift_factor);
+                  var scale_factor = 20;
+                  ctx.lineTo( (scale_factor * Math.cos(j.orientation)) + j.position.x + shift_factor,
+                              (scale_factor * Math.sin(j.orientation)) + j.position.y + shift_factor );
+                  ctx.stroke();
+              })              
+          });
+      }, 1000/update_data_frequency);
+</script>
+
+</html>
